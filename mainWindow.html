@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="./css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+        <script src="./js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="./css/bootstrap-icons.css">
+        <style>
+          .custom {background-color: rgb(60, 177, 242);}
+          .cardbody {
+            width: 100%;
+            height: 23vh;
+          }
+          .card{
+            box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+            text-align: center;
+            margin-bottom: 15px;
+            border-radius: 0px;
+          }
+          .cardhead{
+            margin-top: 5px;
+          }
+          .progstats{
+            overflow: auto;
+            font-size: 2rem;
+          }
+          .maincontent{
+            margin-top: 15px;
+            margin-left: 15px;
+            margin-right: 15px;
+          }
+        </style>
+    <title>midlo</title>
+</head>
+<body>
+<header class="row">
+  <div class="px-3 py-2 custom text-white">
+    <div class="container">
+      <div class="d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start">
+        <a href="#" class="d-flex align-items-center my-2 my-lg-0 me-lg-auto text-white text-decoration-none">
+            <h1>midlo</h1>
+        </a>  
+        <ul class="nav col-12 col-lg-auto my-2 justify-content-center my-md-0 text-small">
+          <li>
+            <a href="#" class="nav-link text-white">
+              Inicio
+            </a>
+          </li>
+          <li>
+            <a href="#" class="nav-link text-secondary">
+              Cargar
+            </a>
+          </li>
+          <li>
+            <a href="#" class="nav-link text-secondary">
+              Ayuda
+            </a>
+          </li>
+          <li>
+            <a href="#" class="nav-link text-secondary">
+              Salir
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="maincontent">
+<div id="loadmsg" class="text-center">
+  Seleccione "Cargar" para mostrar informacion del archivo...
+</div>
+
+<div class="row">
+  <div class="col-md-3">
+    <div class="card">
+      <div class="cardhead">
+        Datos Generales
+      </div>
+      <div class="cardbody">
+        <div id="placeholder" class="text-center progstats">
+        </div>
+      </div>
+    </div>
+      
+    </div>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="cardhead">
+          Progreso Actual
+        </div>
+        <div class="cardbody">
+          <canvas id="hcprog"></canvas>
+        </div>
+      </div>
+    </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="cardhead">
+        Intensidad Luminosa
+      </div>
+      <div class="cardbody">
+        <canvas id="lichart"></canvas>     
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-12">
+    <div class="card">
+      <div class="cardhead">
+        Horas Calor por Dia
+      </div>
+      <div class="cardbody">
+        <canvas id="hcchart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="cardhead">
+        Humedad Relativa
+      </div>
+      <div class="cardbody">
+        <canvas id="humchart"></canvas>
+      </div>
+    </div>    
+  </div>
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="cardhead">
+        Temperatura
+      </div>
+      <div class="cardbody">
+        <canvas id="temchart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+
+<script type="text/javascript">
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+    const ph = document.getElementById('placeholder');
+    const ldmsg = document.getElementById('loadmsg');
+    let xlabels =[];
+    let datahum = [];
+    let datali = [];
+    let datatem = [];
+    let datahc = [];
+    var arr = [];
+
+    if (!Date.prototype.toISOString) {
+  (function() {
+
+    function pad(number) {
+      var r = String(number);
+      if (r.length === 1) {
+        r = '0' + r;
+      }
+      return r;
+    }
+
+    Date.prototype.toISOString = function() {
+      return this.getUTCFullYear() +
+        '-' + pad(this.getUTCMonth() + 1) +
+        '-' + pad(this.getUTCDate()) +
+        'T' + pad(this.getUTCHours()) +
+        ':' + pad(this.getUTCMinutes()) +
+        ':' + pad(this.getUTCSeconds()) +
+        '.' + String((this.getUTCMilliseconds() / 1000).toFixed(3)).slice(2, 5) +
+        'Z';
+    };
+
+  }());
+}
+
+    //Catch Add content
+    ipcRenderer.on('load', function(e, content){
+        // get data and split into rows
+        function calculateAverage(array) {
+        var total = 0;
+        var count = 0;
+
+        array.forEach(function(item, index) {
+            total += item;
+            count++;
+        });
+
+          return total / count;
+        }
+
+        function arrayMin(arr) {
+          return arr.reduce(function (p, v) {
+            return ( p < v ? p : v );
+          });
+        }
+
+        function arrayMax(arr) {
+          return arr.reduce(function (p, v) {
+            return ( p > v ? p : v );
+          });
+        }
+
+        const table = content.split('\n').slice(0,7);
+
+        var arr = content.split('\n') 
+
+        var jsonObj = [];
+        var headers = arr[0].split(',');
+        for(var i = 1; i < arr.length; i++) {
+          var data = arr[i].split(',');
+          var obj = {};
+          for(var j = 0; j < data.length; j++) {
+            obj[headers[j].trim()] = data[j].trim();
+          }
+          jsonObj.push(obj);
+        }
+        console.log(jsonObj);
+        
+        var results = jsonObj.reduce(function(results, single) {
+        (results[single.date] = results[single.date] || []).push(single);
+        return results;
+        }, {})
+        let z = 0;
+        console.log(results);
+        let n = Object.keys(results).length;
+        let x = new Array(n);
+        // maxtemp,mintemp,daytemp,dayhum,daylux
+        for (const [key, value] of Object.entries(results)) {
+          keylen = results[key].length;
+          console.log(key);
+          let tottemp = [];
+          let tothum = [];
+          let totlux = [];
+          for (let i = 0; i < keylen; i++){
+            tottemp.push(parseFloat(results[key][i].temperature));
+            tothum.push(parseFloat(results[key][i].relative_humidity));
+            totlux.push(parseFloat(results[key][i].luxes));
+          };
+          console.log(tottemp);
+          console.log(totlux);
+          console.log(tothum);
+          let daytemp = calculateAverage(tottemp);
+          let dayhum = calculateAverage(tothum);
+          let daylux = calculateAverage(totlux);
+          let maxtemp = arrayMax(tottemp);
+          let mintemp = arrayMin(tottemp);
+          x[z] = new Array(6);
+          if (maxtemp > 30){
+            maxtemp = 30;}
+            if (mintemp < 10){
+            maxtemp = 10;}
+          x[z][0] = maxtemp;
+          x[z][1] = mintemp;
+          x[z][2] = daytemp;
+          x[z][3] = dayhum;
+          x[z][4] = daylux;
+          x[z][5] = ((maxtemp+mintemp)/2)-10;
+          x[z][6] = key;
+          z++;      
+        }
+        
+        console.log(x);
+        function transpose(matrix) {
+          return matrix.reduce((prev, next) => next.map((item, i) =>
+            (prev[i] || []).concat(next[i])
+          ), []);
+        }
+        let tx = transpose(x);
+        console.log("a")
+        console.log(tx);
+
+        function calculatePercentage(array, base) {
+          let total = 0;
+          let res = 0
+          array.forEach(function(item, index) {
+              total += item;
+          });
+            res = (total / base) * 100;
+            res = Math.round((res + Number.EPSILON) * 100) / 100;
+            return res
+        }
+        let hctotal = 0 ;
+        tx[5].forEach(function(item, index) {
+              hctotal += item;
+          });
+
+        percent = calculatePercentage(tx[5],2000);
+        remaining = 100-percent;
+        console.log("percent:")
+        console.log(percent)
+      
+
+              xlabels = tx[6]
+              datahum = tx[3]
+              datali  = tx[4]
+              datatem = tx[2]
+              datahc  = tx[5]
+
+        var Chart = require('chart.js');
+        var ctx = document.getElementById('hcchart').getContext('2d');
+        var chart = new Chart(ctx, {
+            // The type of chart we want to create
+            type: 'bar',
+            // The data for our dataset
+            data: {
+                labels: xlabels,                
+                datasets: [{
+                    label: 'Horas Calor por Dia',
+                    data: datahc,
+                    backgroundColor: 'rgb(120, 192, 145)',
+                    borderColor: 'rgb(120, 192, 145)'
+                }]
+            },
+            // Configuration options go here
+                options: {
+                  maintainAspectRatio: false,
+                  responsive: true,
+                  layout: {
+                      padding: 10
+                  } 
+                }
+        });
+
+        ph.innerHTML =  "<h3>Progreso <b>"+percent+"%</b></h3><h4><b>"+hctotal+"</b> Horas Calor</h4><h3>Faltante <b>"+remaining+"%</b></h3><h4><b>"+(2000-hctotal)+"</b> Horas Calor</h4>";
+    
+        var ctx2 = document.getElementById('hcprog').getContext('2d');
+        var chart2 = new Chart(ctx2, {
+            // The type of chart we want to create
+            type: 'doughnut',
+            // The data for our dataset
+            data: {
+                labels: ["Progreso", "Faltante"],                
+                datasets: [{
+                    label: 'Progreso de Horas Calor',
+                    data: [percent, remaining],
+                    backgroundColor: ['rgb(60, 177, 242)', 'rgb(255, 255, 255)'],
+                    borderColor: 'rgb(60, 177, 242)'
+                }]
+            },
+            // Configuration options go here
+            options: {
+                  maintainAspectRatio: false,
+                  responsive: true,
+                  layout: {
+                      padding: 10
+                  }  
+                }
+        });
+
+        var ctx3 = document.getElementById('lichart').getContext('2d');
+        var chart3 = new Chart(ctx3, {
+            // The type of chart we want to create
+            type: 'bar',
+            // The data for our dataset
+            data: {
+                labels: xlabels,                
+                datasets: [{
+                    label: 'Intensidad del Sol',
+                    data: datali,
+                    backgroundColor: 'rgb(110, 144, 117)',
+                    borderColor: 'rgb(110, 144, 117)'
+                }]
+            },
+            // Configuration options go here
+            options: {
+                  maintainAspectRatio: false,
+                  responsive: true,
+                  layout: {
+                      padding: 10
+                  }  
+                }
+        });
+
+        var ctx4 = document.getElementById('temchart').getContext('2d');
+        var chart4 = new Chart(ctx4, {
+            // The type of chart we want to create
+            type: 'line',
+            // The data for our dataset
+            data: {
+                labels: xlabels,                
+                datasets: [{
+                    label: 'Temperatura',
+                    data: datatem,
+                    backgroundColor: 'rgb(91, 96, 87)',
+                    borderColor: 'rgb(91, 96, 87)'
+                }]
+            },
+            // Configuration options go here
+            options: {
+                  maintainAspectRatio: false,
+                  responsive: true,
+                  layout: {
+                      padding: 10
+                  }  
+                }
+        });
+
+        var ctx5 = document.getElementById('humchart').getContext('2d');
+        var chart5 = new Chart(ctx5, {
+            // The type of chart we want to create
+            type: 'line',
+            // The data for our dataset
+            data: {
+                labels: xlabels,                
+                datasets: [{
+                    label: 'Humedad Relativa',
+                    data: datahum,
+                    backgroundColor: 'rgb(86, 54, 53)',
+                    borderColor: 'rgb(86, 54, 53)'
+                }]
+            },
+            // Configuration options go here
+            options: {
+                  maintainAspectRatio: false,
+                  responsive: true,
+                  layout: {
+                      padding: 10
+                  }  
+                }
+        });
+    });
+
+    // Clear items
+    ipcRenderer.on('item:clear', function(){
+        ldmsg.innerHTML =  '';
+    });
+
+</script>
+
+</body>
+</html>
